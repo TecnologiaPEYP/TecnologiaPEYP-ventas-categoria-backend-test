@@ -10,6 +10,11 @@ import * as path from 'path';
 import * as qrcode from 'qrcode';
 import P from 'pino';
 
+const NO_RETRY_CODES = new Set([
+  DisconnectReason.loggedOut,
+  DisconnectReason.connectionReplaced,
+]);
+
 @Injectable()
 export class WhatsappService implements OnModuleInit {
   private readonly logger = new Logger(WhatsappService.name);
@@ -17,10 +22,18 @@ export class WhatsappService implements OnModuleInit {
   private currentQr: string | null = null;
   private connected = false;
   private reconnecting = false;
+  private retryDelay = 5000;
   private readonly authDir = path.join(process.cwd(), 'wa-auth');
 
   async onModuleInit() {
     await this.connect();
+  }
+
+  private scheduleReconnect() {
+    this.reconnecting = false;
+    const delay = this.retryDelay;
+    this.retryDelay = Math.min(this.retryDelay * 2, 5 * 60 * 1000);
+    setTimeout(() => this.connect(), delay);
   }
 
   private async connect() {
@@ -29,7 +42,7 @@ export class WhatsappService implements OnModuleInit {
 
     try {
       if (this.sock) {
-        try { this.sock.ws.close(); } catch (_) { /* ignorar si ya cerró */ }
+        try { this.sock.ws.close(); } catch (_) { /* ignorar */ }
         this.sock = null;
       }
 
@@ -59,22 +72,26 @@ export class WhatsappService implements OnModuleInit {
           this.connected = true;
           this.currentQr = null;
           this.reconnecting = false;
+          this.retryDelay = 5000;
           this.logger.log('✅ WhatsApp conectado');
         }
 
         if (connection === 'close') {
           this.connected = false;
-          this.reconnecting = false;
           const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
-          const shouldReconnect = code !== DisconnectReason.loggedOut;
-          this.logger.warn(`⚠️ WhatsApp desconectado (${code}). Reconectar: ${shouldReconnect}`);
-          if (shouldReconnect) setTimeout(() => this.connect(), 5000);
+          const shouldReconnect = !NO_RETRY_CODES.has(code as DisconnectReason);
+          this.logger.warn(`⚠️ WhatsApp desconectado (${code}). Reconectar en ${this.retryDelay / 1000}s: ${shouldReconnect}`);
+          if (shouldReconnect) {
+            this.scheduleReconnect();
+          } else {
+            this.reconnecting = false;
+            this.logger.warn('🔴 Sesión cerrada. Escanea el QR en /whatsapp/qr para reconectar.');
+          }
         }
       });
     } catch (err) {
-      this.reconnecting = false;
       this.logger.error('Error al conectar WhatsApp', err);
-      setTimeout(() => this.connect(), 10000);
+      this.scheduleReconnect();
     }
   }
 
