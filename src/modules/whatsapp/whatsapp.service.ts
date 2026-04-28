@@ -25,8 +25,8 @@ export class WhatsappService implements OnModuleInit {
   private retryDelay = 5000;
   private readonly authDir = path.join(process.cwd(), 'wa-auth');
 
-  async onModuleInit() {
-    await this.connect();
+  onModuleInit() {
+    this.connect().catch(err => this.logger.error('WhatsApp init error', err));
   }
 
   private scheduleReconnect() {
