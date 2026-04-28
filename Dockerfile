@@ -25,6 +25,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/package.json ./package.json
 
+RUN mkdir -p /app/wa-auth && chown -R nestjs:nodejs /app/wa-auth
+
 USER nestjs
 EXPOSE 8080
 ENV PORT=8080
