@@ -30,6 +30,14 @@ export class WhatsappService implements OnModuleInit {
     this.connect().catch(err => this.logger.error('WhatsApp init error', err));
   }
 
+  private hasCredentials(): boolean {
+    try {
+      return fs.readdirSync(this.authDir).length > 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
   private clearAuthDir() {
     try {
       for (const file of fs.readdirSync(this.authDir)) {
@@ -65,7 +73,7 @@ export class WhatsappService implements OnModuleInit {
           keys: makeCacheableSignalKeyStore(state.keys, pinoLogger),
         },
         printQRInTerminal: false,
-        browser: ['SanValentín CRM', 'Chrome', '1.0.0'],
+        browser: ['SanValentin CRM', 'Chrome', '1.0.0'],
         logger: pinoLogger,
       });
 
@@ -90,13 +98,20 @@ export class WhatsappService implements OnModuleInit {
           this.connected = false;
           const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
 
-          // 405 = credenciales obsoletas/en conflicto — limpiar y pedir QR nuevo
+          // 405 = sesión en conflicto
           if (code === 405) {
-            this.logger.warn('⚠️ WhatsApp 405 — credenciales obsoletas, limpiando sesión para nuevo QR');
-            this.clearAuthDir();
-            this.reconnecting = false;
-            this.retryDelay = 5000;
-            setTimeout(() => this.connect(), 3000);
+            if (this.hasCredentials()) {
+              // Había credenciales viejas — borrarlas y reconectar rápido para obtener QR nuevo
+              this.logger.warn('⚠️ WhatsApp 405 — credenciales obsoletas, limpiando sesión para nuevo QR');
+              this.clearAuthDir();
+              this.reconnecting = false;
+              this.retryDelay = 5000;
+              setTimeout(() => this.connect(), 3000);
+            } else {
+              // Sin credenciales y sigue rechazando — WhatsApp rate-limiting, usar backoff
+              this.logger.warn('⚠️ WhatsApp 405 sin credenciales — esperando antes de reintentar');
+              this.scheduleReconnect();
+            }
             return;
           }
 
