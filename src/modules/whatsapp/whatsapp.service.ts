@@ -31,7 +31,7 @@ export class WhatsappService implements OnModuleInit {
     try {
       if (this.sock) {
         this.sock.ev.removeAllListeners();
-        this.sock.end(new Error('reconnecting'));
+        try { this.sock.ws.close(); } catch (_) { /* ignorar si ya cerró */ }
         this.sock = null;
       }
 
