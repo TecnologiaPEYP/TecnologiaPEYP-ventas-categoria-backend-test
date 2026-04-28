@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   WASocket,
 } from '@whiskeysockets/baileys';
@@ -35,11 +34,9 @@ export class WhatsappService implements OnModuleInit {
       }
 
       const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
-      const { version } = await fetchLatestBaileysVersion();
       const pinoLogger = P({ level: 'silent' });
 
       this.sock = makeWASocket({
-        version,
         auth: {
           creds: state.creds,
           keys: makeCacheableSignalKeyStore(state.keys, pinoLogger),
