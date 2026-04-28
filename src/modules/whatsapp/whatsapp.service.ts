@@ -15,8 +15,9 @@ import P from 'pino';
 export class WhatsappService implements OnModuleInit {
   private readonly logger = new Logger(WhatsappService.name);
   private sock: WASocket | null = null;
-  private currentQr: string | null = null; // base64 PNG
+  private currentQr: string | null = null;
   private connected = false;
+  private reconnecting = false;
   private readonly authDir = path.join(process.cwd(), 'wa-auth');
 
   async onModuleInit() {
@@ -24,44 +25,61 @@ export class WhatsappService implements OnModuleInit {
   }
 
   private async connect() {
-    const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
-    const { version } = await fetchLatestBaileysVersion();
-    const pinoLogger = P({ level: 'silent' });
+    if (this.reconnecting) return;
+    this.reconnecting = true;
 
-    this.sock = makeWASocket({
-      version,
-      auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, pinoLogger),
-      },
-      printQRInTerminal: false,
-      browser: ['SanValentín CRM', 'Chrome', '1.0.0'],
-      logger: pinoLogger,
-    });
-
-    this.sock.ev.on('creds.update', saveCreds);
-
-    this.sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-      if (qr) {
-        this.connected = false;
-        this.currentQr = await qrcode.toDataURL(qr);
-        this.logger.log('📱 WhatsApp QR listo — visita GET /whatsapp/qr para escanearlo');
+    try {
+      if (this.sock) {
+        this.sock.ev.removeAllListeners();
+        this.sock.end(new Error('reconnecting'));
+        this.sock = null;
       }
 
-      if (connection === 'open') {
-        this.connected = true;
-        this.currentQr = null;
-        this.logger.log('✅ WhatsApp conectado');
-      }
+      const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
+      const { version } = await fetchLatestBaileysVersion();
+      const pinoLogger = P({ level: 'silent' });
 
-      if (connection === 'close') {
-        this.connected = false;
-        const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const shouldReconnect = code !== DisconnectReason.loggedOut;
-        this.logger.warn(`⚠️ WhatsApp desconectado (${code}). Reconectar: ${shouldReconnect}`);
-        if (shouldReconnect) setTimeout(() => this.connect(), 5000);
-      }
-    });
+      this.sock = makeWASocket({
+        version,
+        auth: {
+          creds: state.creds,
+          keys: makeCacheableSignalKeyStore(state.keys, pinoLogger),
+        },
+        printQRInTerminal: false,
+        browser: ['SanValentín CRM', 'Chrome', '1.0.0'],
+        logger: pinoLogger,
+      });
+
+      this.sock.ev.on('creds.update', saveCreds);
+
+      this.sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+        if (qr) {
+          this.connected = false;
+          this.currentQr = await qrcode.toDataURL(qr);
+          this.logger.log('📱 WhatsApp QR listo — visita GET /whatsapp/qr para escanearlo');
+        }
+
+        if (connection === 'open') {
+          this.connected = true;
+          this.currentQr = null;
+          this.reconnecting = false;
+          this.logger.log('✅ WhatsApp conectado');
+        }
+
+        if (connection === 'close') {
+          this.connected = false;
+          this.reconnecting = false;
+          const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
+          const shouldReconnect = code !== DisconnectReason.loggedOut;
+          this.logger.warn(`⚠️ WhatsApp desconectado (${code}). Reconectar: ${shouldReconnect}`);
+          if (shouldReconnect) setTimeout(() => this.connect(), 5000);
+        }
+      });
+    } catch (err) {
+      this.reconnecting = false;
+      this.logger.error('Error al conectar WhatsApp', err);
+      setTimeout(() => this.connect(), 10000);
+    }
   }
 
   getQr(): string | null {
