@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import * as https from 'https';
 
 @Injectable()
 export class MailService {
@@ -52,46 +51,6 @@ export class MailService {
     } catch (error: unknown) {
       console.error('❌ Error enviando KPI report:', (error as Error).message);
       throw error;
-    }
-  }
-
-  async sendWhatsApp(target: string, message: string, provider: 'callmebot' | 'ultramsg', instanceId?: string, instanceToken?: string) {
-    if (provider === 'callmebot') {
-      // CallMeBot: solo números personales. target = "+57XXXXXXXXXX", apikey en .env
-      const apikey = this.configService.get('CALLMEBOT_APIKEY') || '';
-      const phone  = target.replace(/\s/g, '');
-      const text   = encodeURIComponent(message);
-      const url    = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${text}&apikey=${apikey}`;
-      await new Promise<void>((resolve, reject) => {
-        https.get(url, res => {
-          let body = '';
-          res.on('data', chunk => body += chunk);
-          res.on('end', () => {
-            console.log(`✅ WhatsApp CallMeBot → ${phone} | ${res.statusCode} ${body.slice(0, 80)}`);
-            resolve();
-          });
-        }).on('error', reject);
-      });
-    } else {
-      // UltraMsg: soporta números Y grupos. target = número "57XXXXXXXXXX" o chatId de grupo
-      const token = instanceToken || this.configService.get('ULTRAMSG_TOKEN') || '';
-      const id    = instanceId   || this.configService.get('ULTRAMSG_INSTANCE') || '';
-      if (!token || !id) throw new Error('Configura ULTRAMSG_INSTANCE y ULTRAMSG_TOKEN en el .env');
-      const body = JSON.stringify({ token, to: target, body: message });
-      await new Promise<void>((resolve, reject) => {
-        const req = https.request(
-          { hostname: 'api.ultramsg.com', path: `/${id}/messages/chat`, method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } },
-          res => {
-            let data = '';
-            res.on('data', c => data += c);
-            res.on('end', () => { console.log(`✅ WhatsApp UltraMsg → ${target} | ${data.slice(0,80)}`); resolve(); });
-          }
-        );
-        req.on('error', reject);
-        req.write(body);
-        req.end();
-      });
     }
   }
 

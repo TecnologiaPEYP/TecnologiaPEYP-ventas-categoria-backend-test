@@ -7,6 +7,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as qrcode from 'qrcode';
 import P from 'pino';
 
@@ -27,6 +28,15 @@ export class WhatsappService implements OnModuleInit {
 
   onModuleInit() {
     this.connect().catch(err => this.logger.error('WhatsApp init error', err));
+  }
+
+  private clearAuthDir() {
+    try {
+      for (const file of fs.readdirSync(this.authDir)) {
+        fs.unlinkSync(path.join(this.authDir, file));
+      }
+      this.logger.log('🗑️ Credenciales de WhatsApp eliminadas — se pedirá nuevo QR');
+    } catch (_) { /* directorio vacío o inexistente */ }
   }
 
   private scheduleReconnect() {
@@ -79,6 +89,17 @@ export class WhatsappService implements OnModuleInit {
         if (connection === 'close') {
           this.connected = false;
           const code = (lastDisconnect?.error as Boom)?.output?.statusCode;
+
+          // 405 = credenciales obsoletas/en conflicto — limpiar y pedir QR nuevo
+          if (code === 405) {
+            this.logger.warn('⚠️ WhatsApp 405 — credenciales obsoletas, limpiando sesión para nuevo QR');
+            this.clearAuthDir();
+            this.reconnecting = false;
+            this.retryDelay = 5000;
+            setTimeout(() => this.connect(), 3000);
+            return;
+          }
+
           const shouldReconnect = !NO_RETRY_CODES.has(code as DisconnectReason);
           this.logger.warn(`⚠️ WhatsApp desconectado (${code}). Reconectar en ${this.retryDelay / 1000}s: ${shouldReconnect}`);
           if (shouldReconnect) {
@@ -108,7 +129,6 @@ export class WhatsappService implements OnModuleInit {
       throw new Error('WhatsApp no está conectado. Escanea el QR en GET /whatsapp/qr');
     }
 
-    // Normalizar JID: número → "573001234567@s.whatsapp.net"  grupo → "120363xxx@g.us"
     let jid = to.trim();
     if (!jid.includes('@')) {
       jid = jid.replace(/\D/g, '') + '@s.whatsapp.net';

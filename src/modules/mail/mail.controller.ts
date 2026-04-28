@@ -22,11 +22,7 @@ export class MailController {
   @Post('whatsapp-kpi')
   async sendWhatsappKpi(@Body() dto: SendWhatsappDto) {
     try {
-      if (dto.provider === 'baileys') {
-        await this.waService.sendMessage(dto.target, dto.message, dto.imageBase64);
-      } else {
-        await this.mailService.sendWhatsApp(dto.target, dto.message, dto.provider as 'callmebot' | 'ultramsg', dto.instanceId, dto.instanceToken);
-      }
+      await this.waService.sendMessage(dto.target, dto.message, dto.imageBase64);
       return { message: 'WhatsApp enviado exitosamente' };
     } catch (err: unknown) {
       throw new BadRequestException((err as Error).message);
