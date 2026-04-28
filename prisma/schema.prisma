@@ -1,0 +1,191 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               Int              @id @default(autoincrement())
+  email            String           @unique
+  password         String?
+  name             String?
+  lastName         String?
+  cedula           String?          @unique
+  birthDate        DateTime?
+  phone            String?
+  position         String?          // cargo
+  googleId         String?
+  profileComplete  Boolean          @default(false)
+  roleId           Int?
+  role             Role?            @relation(fields: [roleId], references: [id])
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  createdTickets   Ticket[]         @relation("CreatedTickets")
+  ticketReplies    TicketReply[]
+  reportes         ReporteGuardado[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+
+model Cliente {
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String
+  phone          String
+  birthDate      DateTime
+  country        String
+  documentType   String
+  documentNumber String
+  createdAt      DateTime @default(now())
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique   // admin, empleado, supervisor, etc.
+  description String?
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique   // dashboard:view, users:manage, stats:view, etc.
+  description String?
+  module      String           // dashboard, users, stats, settings, profile
+  action      String           // view, create, edit, delete, manage
+  roles       RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Ticket {
+  id          Int           @id @default(autoincrement())
+  subject     String
+  status      String        @default("open")       // open, in-progress, resolved, closed
+  priority    String        @default("normal")      // low, normal, high
+  creatorId   Int
+  creator     User          @relation("CreatedTickets", fields: [creatorId], references: [id], onDelete: Cascade)
+  replies     TicketReply[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([creatorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TicketReply {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.Text
+  ticketId  Int
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  isStaff   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([authorId])
+}
+
+model ReporteGuardado {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  fileName  String?
+  datos     Json     // { horas, prods, rawRows, rows }
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AiCache {
+  id        Int      @id @default(autoincrement())
+  cacheKey  String   @unique @db.VarChar(512)
+  question  String   @db.Text
+  answer    String   @db.LongText
+  hits      Int      @default(0)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model RegistroCumpleanos {
+  id              Int      @id @default(autoincrement())
+  nombre          String
+  correo          String
+  telefono        String
+  fechaNacimiento DateTime?
+  pais            String
+  ciudad          String?
+  tipoDocumento   String?
+  numeroDocumento String?
+  categoria       String?
+  subcategoria    String?
+  aceptaPolitica  Boolean?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model RegistroCaptacion {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  empresa   String?
+  telefono  String
+  email     String
+  acepto    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model ProductoRelacion {
+  id        Int      @id @default(autoincrement())
+  producto  String   @unique  // nombre del producto en mayúsculas
+  relacion  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([relacion])
+}
+
+model RegistroCrm {
+  id                Int      @id @default(autoincrement())
+  segmentos         Json?    // array de strings (legacy)
+  nombre            String
+  correo            String
+  telefono          String
+  fechaNacimiento   DateTime?
+  pais              String
+  ciudad            String?
+  tipoDocumento     String?
+  numeroDocumento   String?
+  tipoEvento        String?
+  categoria         String?  // Social | Alianza | Cumpleaños
+  subcategoria      String?  // Boda | Comfenalco | etc.
+  aceptaPolitica    Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([categoria])
+}
