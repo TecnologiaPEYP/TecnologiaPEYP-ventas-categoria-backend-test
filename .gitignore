@@ -46,6 +46,9 @@ lerna-debug.log*
 .temp
 .tmp
 
+# WhatsApp session files (never commit credentials)
+/wa-auth
+
 # Runtime data
 pids
 *.pid
