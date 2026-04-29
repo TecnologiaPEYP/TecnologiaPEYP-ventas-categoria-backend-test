@@ -52,7 +52,7 @@ export class WhatsappService implements OnModuleInit {
     this.reconnecting = false;
     const delay = this.retryDelay;
     this.retryDelay = Math.min(this.retryDelay * 2, 5 * 60 * 1000);
-    setTimeout(() => this.connect(), delay);
+    setTimeout(() => this.connect().catch(err => this.logger.error('WhatsApp reconnect error', err)), delay);
   }
 
   private async connect() {
@@ -81,6 +81,7 @@ export class WhatsappService implements OnModuleInit {
       this.sock.ev.on('creds.update', saveCreds);
 
       this.sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+        try {
         if (qr) {
           this.connected = false;
           this.currentQr = await qrcode.toDataURL(qr);
@@ -108,7 +109,7 @@ export class WhatsappService implements OnModuleInit {
               this.clearAuthDir();
               this.reconnecting = false;
               this.retryDelay = 5000;
-              setTimeout(() => this.connect(), 3000);
+              setTimeout(() => this.connect().catch(err => this.logger.error('WhatsApp reconnect error', err)), 3000);
             } else {
               // Sin credenciales y sigue rechazando — WhatsApp rate-limiting, usar backoff
               if (!this.silentRetry) {
@@ -128,6 +129,9 @@ export class WhatsappService implements OnModuleInit {
             this.silentRetry = false;
             this.logger.warn('🔴 WhatsApp desconectado. Escanea el QR en /whatsapp/qr para reconectar.');
           }
+        }
+        } catch (err) {
+          this.logger.error('WhatsApp event error', err);
         }
       });
     } catch (err) {
