@@ -121,12 +121,12 @@ export class WhatsappService implements OnModuleInit {
           }
 
           const shouldReconnect = !NO_RETRY_CODES.has(code as DisconnectReason);
-          this.logger.warn(`⚠️ WhatsApp desconectado (${code}). Reconectar en ${this.retryDelay / 1000}s: ${shouldReconnect}`);
           if (shouldReconnect) {
             this.scheduleReconnect();
           } else {
             this.reconnecting = false;
-            this.logger.warn('🔴 Sesión cerrada. Escanea el QR en /whatsapp/qr para reconectar.');
+            this.silentRetry = false;
+            this.logger.warn('🔴 WhatsApp desconectado. Escanea el QR en /whatsapp/qr para reconectar.');
           }
         }
       });
