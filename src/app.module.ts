@@ -12,7 +12,6 @@ import { ReportesModule } from './modules/reportes/reportes.module';
 import { RegistrosModule } from './modules/registros/registros.module';
 import { ProductRelacionesModule } from './modules/product-relaciones/product-relaciones.module';
 import { MailModule } from './modules/mail/mail.module';
-import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -27,7 +26,6 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
     RegistrosModule,
     ProductRelacionesModule,
     MailModule,
-    WhatsappModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,17 +1,12 @@
 import { Controller, Post, Body, UseGuards, BadRequestException } from '@nestjs/common';
 import { MailService } from './services/mail.service';
 import { SendKpiReportDto } from './dto/send-kpi-report.dto';
-import { SendWhatsappDto } from './dto/send-whatsapp.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('mail')
 export class MailController {
-  constructor(
-    private readonly mailService: MailService,
-    private readonly waService: WhatsappService,
-  ) {}
+  constructor(private readonly mailService: MailService) {}
 
   @Post('kpi-report')
   async sendKpiReport(@Body() dto: SendKpiReportDto) {
@@ -20,12 +15,7 @@ export class MailController {
   }
 
   @Post('whatsapp-kpi')
-  async sendWhatsappKpi(@Body() dto: SendWhatsappDto) {
-    try {
-      await this.waService.sendMessage(dto.target, dto.message, dto.imageBase64);
-      return { message: 'WhatsApp enviado exitosamente' };
-    } catch (err: unknown) {
-      throw new BadRequestException((err as Error).message);
-    }
+  async sendWhatsappKpi() {
+    throw new BadRequestException('WhatsApp no está disponible. Usa la opción de Correo.');
   }
 }
