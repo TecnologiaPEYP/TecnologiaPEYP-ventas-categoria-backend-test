@@ -24,6 +24,7 @@ export class WhatsappService implements OnModuleInit {
   private connected = false;
   private reconnecting = false;
   private retryDelay = 5000;
+  private silentRetry = false;
   private readonly authDir = path.join(process.cwd(), 'wa-auth');
 
   onModuleInit() {
@@ -91,6 +92,7 @@ export class WhatsappService implements OnModuleInit {
           this.currentQr = null;
           this.reconnecting = false;
           this.retryDelay = 5000;
+          this.silentRetry = false;
           this.logger.log('✅ WhatsApp conectado');
         }
 
@@ -109,7 +111,10 @@ export class WhatsappService implements OnModuleInit {
               setTimeout(() => this.connect(), 3000);
             } else {
               // Sin credenciales y sigue rechazando — WhatsApp rate-limiting, usar backoff
-              this.logger.warn('⚠️ WhatsApp 405 sin credenciales — esperando antes de reintentar');
+              if (!this.silentRetry) {
+                this.logger.warn('⚠️ WhatsApp 405 — esperando conexión, visita /whatsapp/qr cuando esté disponible');
+                this.silentRetry = true;
+              }
               this.scheduleReconnect();
             }
             return;
